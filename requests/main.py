@@ -75,7 +75,7 @@ class Request(object):
 
              一旦请求成功发送，`sent`将等于True。
 
-             ：param反正：如果为True，请求将被发送，即使它
+             ：param anyway：如果为True，请求将被发送，即使它
              已经发送
         """
 
@@ -104,6 +104,29 @@ class Request(object):
                     self.response.headers = resp.info().dict
                     if self.method.lower() == 'get':
                         self.response.content = resp.read()
+
+                    success = True
+                except urllib2.HTTPError as why:
+                    self.response.status_code = why.code
+
+        elif self.method == 'POST':
+            if (not self.sent) or anyway:
+                req = _Request(self.url, method='POST')
+
+                if self.headers:
+                    req.headers = self.headers
+
+                if isinstance(self.data, dict):
+                    req.data = urllib.urlencode(self.data)
+                else:
+                    req.data = self.data
+
+                try:
+                    opener = self._get_opener()
+                    resp = opener(req)
+                    self.response.status_code = resp.code
+                    self.response.headers = resp.info().dict
+                    self.response.content = resp.read()
 
                     success = True
                 except urllib2.HTTPError as why:
@@ -142,6 +165,19 @@ def get(url, params={}, headers={}, auth=None):
 
     r = Request()
     r.method = 'GET'
+    r.url = url
+    r.params = params
+    r.headers = headers
+    r.auth = _detect_auth(url, auth)
+
+    r.send()
+
+    return r.response
+
+
+def post(url, params={}, headers={}, auth=None):
+
+    r = Request()
     r.url = url
     r.params = params
     r.headers = headers
